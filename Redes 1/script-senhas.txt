@@ -1,0 +1,37 @@
+S1-AW>enable
+S1-AW#configure terminal
+security passwords min-length 10
+S1-AW(config)#enable secret @dmin-andrea
+S1-AW(config)#line con 0
+S1-AW(config-line)#password @Cons-andrea
+S1-AW(config-line)#login
+S1-AW(config-line)#line vty 0 4
+S1-AW(config-line)#password redes2079852
+S1-AW(config-line)#end
+S1-AW#configure terminal
+S1-AW(config)#banner motd #
+Enter TEXT message.  End with the character '#'.
+-------------------------------------------------
+|            Roteador Coronel Vivida            |
+|                                               |
+| ATENCAO Acesso Restrito a pessoas autorizadas!|
+|     Administrador: Andrea Weber               |
+|       (andreaweber@alunos.utfpr.edu.br)       |
+|                                               |
+-------------------------------------------------
+#
+//vty deslogada por 5 minutos de inatividade
+S1-AW(config)#line con 0
+S1-AW(config)#exec-timeout 5
+//bloqueia por 120s apos 3 tentativas em 60s
+//funciona para routers so
+S1-AW(config)#login block-for 120 attempts 3 within 60
+
+
+//SSH
+line vty 0 15
+login local
+exit
+username andrea password ssh@Network1ng
+ip domain-name andrea.weber.com.br
+crypto key generate rsa general-keys modulus 1024

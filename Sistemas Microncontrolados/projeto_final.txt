@@ -1,0 +1,163 @@
+#include "msp430g2553.h"
+#include <stdio.h>
+#include <math.h>
+
+unsigned long int contador=0;
+unsigned char flag_estado=0;
+unsigned int ADC10_vetor[32]={0};
+unsigned int soma=0;
+unsigned char i=0;
+float ppm=0;
+float vout = 0;
+#define conv 0.00351;
+unsigned char est_ant=0;
+
+void ini_ucon(void);
+void setup_gpio(void);
+void ini_Timer0(void);
+void ini_ADC10(void);
+void ini_Timer1(void);
+
+void ini_ucon(void){
+WDTCTL = WDTPW | WDTHOLD;
+DCOCTL = CALDCO_8MHZ;
+BCSCTL1 = CALBC1_8MHZ;
+BCSCTL2 = DIVS0 + DIVS1;
+__enable_interrupt();
+}
+
+void setup_gpio(void){
+    P1DIR = BIT0 + BIT1 + BIT2 + BIT4 + BIT5 + BIT6 + BIT7;
+    P1REN = BIT3;
+    P1OUT = BIT3;
+    P1IES = BIT3;
+    P1IFG = 0;
+    P1IE = BIT3;
+    P2DIR = 0xFF;
+    P2SEL |= BIT1;
+    P2OUT = 0x00;
+}
+
+
+void ini_Timer0(void){
+    TA0CTL = TASSEL1  + MC0;
+    TA0CCTL1 = OUTMOD0 + OUTMOD1 + OUTMOD2 + OUT;
+    TA0CCR0 = 49999;
+    TA0CCR1 = 24999;
+    TA0CCTL0 = CCIE;
+}
+
+void ini_Timer1(void){
+    TA1CTL = TASSEL1 + MC0;
+    TA1CCTL1 = OUTMOD0 + OUTMOD1 + OUTMOD2 + OUT;
+    TA1CCR0 = 10000-1;
+    TA1CCR1 = 10000-1;
+    TA1CCTL0 = CCIE;
+}
+
+void ini_ADC10(void){
+     ADC10CTL0 = ADC10SHT1 + MSC + ADC10ON + ADC10IE;
+     ADC10CTL1 = INCH0 + INCH2 + SHS0 + ADC10SSEL0 + ADC10SSEL1 +  CONSEQ1;
+     ADC10AE0 = BIT5;
+     ADC10DTC0 = 0;
+     ADC10DTC1 = 32;
+     ADC10SA = &ADC10_vetor[0];
+     ADC10CTL0 |= ENC;
+}
+
+
+int main(void){
+
+    ini_ucon();
+    setup_gpio();
+    ini_Timer0();
+    ini_ADC10();
+    ini_Timer1();
+
+   do{
+
+   }while(1);
+
+}
+
+#pragma vector=ADC10_VECTOR
+__interrupt void ADC10_RTI(void){
+ADC10CTL0 &= ~ENC;
+if(flag_estado==1){
+for(i=0;i<32;i++){
+    soma = soma + ADC10_vetor[i];
+}
+soma = soma >> 5;
+vout = soma * conv;
+ppm = ((5/vout-1)/19.709);
+ppm = pow(ppm,-1.533);
+
+}
+ADC10SA = &ADC10_vetor[0];
+ADC10CTL0 |= ENC;
+}
+
+#pragma vector=TIMER0_A0_VECTOR
+__interrupt void RTI_do_M0_do_Timer0(void){
+
+    contador++;
+
+    /**********************PISCADA DO LED****************************/
+    if(flag_estado==0 && contador%3==0){
+        P1OUT ^= BIT0;
+    }
+    else if(flag_estado==1 && contador%6==0){
+        P1OUT ^= BIT0;
+    }
+    /*********************ESTADO AQUECEDOR***************************/
+    if(contador==1200 && flag_estado==0){
+        flag_estado=1;
+        TA1CCR1 = 2800-1;
+        ADC10CTL0 |= ENC + ADC10SC;
+    }
+    else if(contador==3000 && flag_estado==1){
+        flag_estado=2;
+        P1OUT = BIT0;
+        TA1CCR1 = 10000-1;
+    }
+    else if(contador==3020 && flag_estado==2){
+        flag_estado=0;
+        contador=0;
+    }
+    /**********************LEITURA DOS ESTADOS / BUZZER **********/
+    if(flag_estado==1){
+    if(ppm<=10){
+        P1OUT |= BIT7;
+    }
+    else if(ppm>10 && ppm<=20){
+        P1OUT |= BIT7;
+        P2OUT |= BIT2;
+    }
+    else if(ppm>20 && ppm<=30){
+        P1OUT |= BIT7;
+        P2OUT |= BIT2+BIT3;
+    }
+    else if(ppm>30 && ppm<=40){
+        P1OUT |= BIT7;
+        P2OUT |= BIT2+BIT3+BIT4;
+    }
+    else{
+        P1OUT |= BIT7+BIT4;
+        P2OUT |= BIT2+BIT3+BIT4+BIT5;
+    }
+    }
+    else{
+        P1OUT &= ~(BIT7+BIT4);
+        P2OUT &= ~(BIT2+BIT3+BIT4+BIT5+BIT7);
+    }
+
+}
+
+#pragma vector=TIMER1_A0_VECTOR
+__interrupt void RTI_do_M0_do_Timer1(void){
+    if( (~P1IN) & BIT3 ){
+    P1OUT ^= BIT0;
+    }
+    P1IFG &= ~BIT3;
+    P1IE |= BIT3;
+}
