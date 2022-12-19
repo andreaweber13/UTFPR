@@ -1,3 +1,5 @@
+//projeto de um medidor de CO, desenvolvido pelos alunos: Leticia Ferreti, Andrea Weber, Ezequiel Gonschorowski, Fernando Lima, Eduarda Vasconcelos e Jolio Neto
+
 #include "msp430g2553.h"
 #include <stdio.h>
 #include <math.h>
